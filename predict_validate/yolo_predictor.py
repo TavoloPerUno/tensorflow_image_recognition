@@ -4,128 +4,97 @@ import argparse
 from skimage import io
 import logging
 import datetime
-
-# sys.path.append('/Users/Manu/Documents/pyWorkspace/darknet/python')
-sys.path.append('/Users/Manu/Documents/pyWorkspace/darknet')
-sys.path.append('..', )
-
-import addons.darknet as dn
-import pdb
-import shutil
-import numpy as np
+import csv
 import cv2
 import pandas as pd
-import urllib.parse
 
-logname = os.path.join('..', 'logs', 'tensorflow_image_recognition_yolo_detection {:%Y-%m-%d %H:%M:%S}.log'.format(datetime.datetime.now()))
-handler = logging.FileHandler(logname, mode='a')
+# sys.path.append('/Users/Manu/Documents/pyWorkspace/darknet/python')
+DARKNET_LOCATION = '/Users/Manu/Documents/pyWorkspace/darknet'
 
-def modify_url_components(url, dct_param):
-	url_parts = list(urllib.parse.urlparse(url))
-	query = dict(urllib.parse.parse_qsl(url_parts[4]))
-	query.update(dct_param)
-	url_parts[4] = urllib.parse.urlencode(query)
-	return urllib.parse.urlunparse(url_parts)
+sys.path.append(DARKNET_LOCATION)
+sys.path.append('..', )
 
-def edit_image_urls(input_file, lst_key):
+import predict_validate.darknet as dn
+from predict_validate.predictor import Predictor
 
-	df_images = pd.read_excel(input_file,  sheet_name='all_cities')
+class YoloPredictor(Predictor):
 
-	lstdf_images = []
+	def __init__(self, model_name, data_folder, file_imagelist, file_class, images_from_api=False, images_location=None, file_class_grouping_json=None,
+				 file_groundtruth=None, file_predictions=None):
+		super().__init__(model_name, data_folder, file_imagelist, file_class, images_from_api, images_location, file_class_grouping_json,
+						 file_groundtruth, file_predictions)
 
-	for chunk, df_images_sub in df_images.groupby(np.arange(df_images.shape[0]) // (df_images.shape[0]//len(lst_key))):
-		df_images_sub['x'] = df_images_sub['x'].apply(modify_url_components, args=({'key': lst_key[chunk]},))
-		lstdf_images.append(df_images_sub)
+		self.cfg = os.path.join('..', 'custom_models', 'yolo', self.model_name, self.model_name + '.cfg')
+		self.cdata = os.path.join('..', 'custom_models', 'yolo', self.model_name, self.model_name + '.data')
 
-	pd.concat(lstdf_images).to_csv(input_file, index=False)
+		self.weights = os.path.join('..', 'custom_models', 'yolo', self.model_name, self.model_name + '.weights')
 
+		self.net = dn.load_net(self.cfg.encode('utf-8'), self.weights.encode('utf-8'), 0)
+		self.meta = dn.load_meta(self.cdata.encode('utf-8'))
 
-def get_predictions(input_file, net, meta):
+	def predict(self):
 
-	df_images = pd.read_csv(input_file)
-	df_predictions = pd.DataFrame(columns=['id', 'class', 'center_x', 'center_y', 'width', 'height', 'min_x', 'max_x', 'min_y', 'max_y'])
+		df_predictions = pd.DataFrame(
+			columns=['id', 'class', 'confidence', 'center_x', 'center_y', 'width', 'height', 'min_x', 'max_x', 'min_y',
+					 'max_y'])
 
-	for idx, row in df_images.iterrows():
-		while True:
-			output_img = os.path.join('..', 'data', 'jobs', 'yolo_prediction', 'output', str(row['id']) + '.jpg')
-			img = io.imread(row['x'])
+		if not os.path.exists(os.path.join(self.data_folder, 'predictions')):
+			os.makedirs(os.path.join(self.data_folder, 'predictions'))
+
+		for idx, row in self.df_images[['id', 'location']].drop_duplicates().iterrows():
+			output_img = os.path.join(self.data_folder, 'predictions', str(row['id']) + '.jpg')
+			img = io.imread(row['location']) if self.images_from_api else io.imread(os.path.join(self.images_location, str(row[id]) + '.jpg'))
 			io.imsave(output_img, img)
 
-
 			pathb = output_img.encode('utf-8')
-			res = dn.detect(net, meta, pathb)
+			res = dn.detect(self.net, self.meta, pathb)
 			logging.info("Processing image id " + str(row['id']))
 			logging.info(res)  # list of name, probability, bounding box center x, center y, width, height
-			i = 0
-			while i < len(res):
+			img = cv2.imread(output_img)
+			for i in range(len(res)):
 				res_type = res[i][0].decode('utf-8')
+				if res_type in self.lst_class:
+					logging.info("Found a " + res_type)
 
-				# get bounding box
-				center_x = int(res[i][2][0])
-				center_y = int(res[i][2][1])
-				width = int(res[i][2][2])
-				height = int(res[i][2][3])
+					# get bounding box
+					confidence = round(res[i][1], 2)
+					center_x = int(res[i][2][0])
+					center_y = int(res[i][2][1])
+					width = int(res[i][2][2])
+					height = int(res[i][2][3])
 
-				UL_x = int(center_x - width / 2)  # Upper Left corner X coord
-				UL_y = int(center_y + height / 2)  # Upper left Y
-				LR_x = int(center_x + width / 2)
-				LR_y = int(center_y - height / 2)
+					UL_x = int(center_x - width / 2)  # Upper Left corner X coord
+					UL_y = int(center_y + height / 2)  # Upper left Y
+					LR_x = int(center_x + width / 2)
+					LR_y = int(center_y - height / 2)
 
 					# write bounding box to image
-					cv2.rectangle(img, (UL_x, UL_y), (LR_x, LR_y), box_color, 5)
+					cv2.rectangle(img, (UL_x, UL_y), (LR_x, LR_y), (255, 255, 255), 1)
 					# put label on bounding box
 					font = cv2.FONT_HERSHEY_SIMPLEX
-					cv2.putText(img, res_type, (center_x, center_y), font, 2, box_color, 2, cv2.LINE_AA)
-					i = i + 1
-				cv2.imwrite(new_path, img)  # wait until all the objects are marked and then write out.
-				# todo. This will end up being put in the last path that was found if there were multiple
-				# it would be good to put it all the paths.
-				os.remove(path)  # remove the original
+					cv2.putText(img, res_type + '-' + str(confidence), (center_x, center_y), font, 0.3, (255, 255, 255),
+								1, cv2.LINE_AA)
+					# 	i = i + 1
+					cv2.imwrite(os.path.join(self.data_folder, 'predictions', str(row['id']) + '.jpg'), img)
 
-def main(argv):
-	parser = argparse.ArgumentParser(description='Predict with yolo_prediction models')
+					df_predictions = df_predictions.append(pd.DataFrame({'id': row['id'],
+																		 'class': res_type,
+																		 'confidence': confidence,
+																		 'center_x': center_x,
+																		 'center_y': center_y,
+																		 'width': width,
+																		 'height': height,
+																		 'min_x': UL_x,
+																		 'max_x': LR_x,
+																		 'min_y': LR_y,
+																		 'max_y': UL_y
+																		 },
+																		index=[0]
+																		, ),
+														   ignore_index=True
+														   )
 
-	# parser.add_argument('cfg', type=str,
-	# 					help='Config file')
-	#
-	# parser.add_argument('cdata', type=int,
-	# 					help='Config data file')
-	#
-	# parser.add_argument('w', type=str,
-	# 					help='Weights')
-
-	parser.add_argument('f', type=str,
-						help='image list')
-
-	parser.add_argument('-k1', type=str,
-						help='google key')
-	parser.add_argument('-k2', type=str,
-						help='google key')
-	parser.add_argument('-k3', type=str,
-						help='google key')
-	parser.add_argument('-k4', type=str,
-						help='google key')
-
-	parser.add_argument('-n', type=int,
-						help='change image url keys')
+			df_predictions.to_csv(os.path.join(self.data_folder, 'predictions.csv'), index=False)
+			self.df_predictions = df_predictions
 
 
-	args = parser.parse_args()
-
-	# cfg = args.cfg
-	# cdata = args.cdata
-	#
-	# weights = args.w
-	input_file = args.f
-	lst_key = [args.k1, args.k2, args.k3, args.k4]
-	change_key = args.n
-
-	if change_key==1:
-		edit_image_urls(input_file, lst_key)
-
-	# net = dn.load_net(cfg.encode('utf-8'), weights.encode('utf-8'), 0)
-	# meta = dn.load_meta(cdata.encode('utf-8'))
-	#
-	# get_predictions(input_file, net, meta)
-if __name__ == '__main__':
-	main(sys.argv[1:])

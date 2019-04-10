@@ -28,12 +28,13 @@ logging = logging.getLogger()
 logging.addHandler(handler)
 
 dct_global_constants = dict()
-dct_global_constants['compressed_annotations_folder'] =os.path.join('..', 'mounted_bucket', 'annotations_compressed')
-dct_global_constants['annotations_folder'] = os.path.join('..', 'mounted_bucket', 'annotations')
-dct_global_constants['meta_folder'] = os.path.join('..', 'mounted_bucket', 'metadata')
+dct_global_constants['compressed_annotations_folder'] =os.path.join('..', 'data', 'training', 'annotations_compressed')
+dct_global_constants['annotations_folder'] = os.path.join('..', 'data', 'training', 'annotations')
+dct_global_constants['meta_folder'] = os.path.join('..', 'data', 'training', 'metadata')
 
-dct_global_constants['compressed_images_folder'] = os.path.join('..', 'mounted_bucket', 'images_compressed')
-dct_global_constants['images_folder'] = os.path.join('..', 'mounted_bucket', 'images')
+dct_global_constants['compressed_images_folder'] = os.path.join('..', 'data', 'training', 'images_compressed')
+dct_global_constants['images_folder'] = os.path.join('..', 'data', 'training', 'images')
+
 def polygon_to_bounding_box(lst_vertex):
 
 	minx, miny = float("inf"), float("inf")
