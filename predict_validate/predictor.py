@@ -30,7 +30,7 @@ class Predictor(ABC):
 
 		if file_class_grouping_json is not None:
 			with open(file_class_grouping_json) as f:
-				self.dct_class_grouping = json.load(file_class_grouping_json)
+				self.dct_class_grouping = json.load(f)
 
 
 		if file_predictions is not None:

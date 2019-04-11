@@ -69,16 +69,14 @@ def main(argv):
 
 	args = parser.parse_args()
 
-	data_folder = os.path.join(data_folder, args.j)
+	data_folder = os.path.join(data_folder, args.job_name)
 
-	change_key = args.n
-
-	if change_key == 1:
+	if args.new_key:
 		lst_key = [args.k1, args.k2, args.k3, args.k4]
 		edit_image_urls(args.file_imagelist, lst_key)
 
 	if args.model_type == 'yolo':
-		model = YoloPredictor(args.model_name, data_folder, args.file_imagelist, args.file_class, args.online_images, args.images_location, args.file_class_grouping_json,
+		model = YoloPredictor(args.model_name, data_folder, args.file_imagelist, args.file_class, args.online_images, args.images_folder, args.file_class_grouping_json,
 				 args.file_groundtruth, args.file_predictions)
 
 		if args.p:

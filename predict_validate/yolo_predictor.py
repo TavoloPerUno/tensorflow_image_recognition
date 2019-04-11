@@ -43,7 +43,7 @@ class YoloPredictor(Predictor):
 
 		for idx, row in self.df_images[['id', 'location']].drop_duplicates().iterrows():
 			output_img = os.path.join(self.data_folder, 'predictions', str(row['id']) + '.jpg')
-			img = io.imread(row['location']) if self.images_from_api else io.imread(os.path.join(self.images_location, str(row[id]) + '.jpg'))
+			img = io.imread(row['location'] if self.images_from_api else os.path.join(self.images_location, str(row['id']) + '.jpg'))
 			io.imsave(output_img, img)
 
 			pathb = output_img.encode('utf-8')
