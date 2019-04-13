@@ -9,6 +9,11 @@ from predict_validate.yolo_predictor import YoloPredictor
 
 logname = os.path.join('..', 'logs', 'tensorflow_image_recognition_detection {:%Y-%m-%d %H:%M:%S}.log'.format(datetime.datetime.now()))
 handler = logging.FileHandler(logname, mode='a')
+logging.basicConfig(format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+                    datefmt='%H:%M:%S',
+                    level=logging.INFO)
+logging = logging.getLogger()
+logging.addHandler(handler)
 data_folder = os.path.join('..', 'data', 'prediction')
 
 def main(argv):
