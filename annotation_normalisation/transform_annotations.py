@@ -8,6 +8,7 @@ import datetime
 import argparse
 import json
 import shutil
+from PIL import Image
 from logging.handlers import TimedRotatingFileHandler
 
 sys.path.append('..', )
@@ -80,6 +81,11 @@ def download_data(source, is_compressed):
 
 	return
 
+def get_image_dimensions(imgname):
+    im = Image.open(imgname)
+    width, height = im.size
+    return width, height
+
 def get_yolo_coordinates(x_min, x_max, y_min, y_max, img_width, img_height):
 	x1 = float(x_min)
 	y1 = float(y_min)
@@ -95,10 +101,41 @@ def get_yolo_coordinates(x_min, x_max, y_min, y_max, img_width, img_height):
 
 	return relative_x_center, relative_y_center, relative_object_width, relative_object_height
 
+def get_normalised_miot_annotations(dfrow):
+    img_width, img_height = get_image_dimensions(os.path.join(dct_global_constants['images_folder'], 'miotcd', 'MIO-TCD-Localization', 'train', '{}.jpg'.format(dfrow['image'])))
+    dfrow['dataset'] = 'miotcd'
+    dfrow['subset'] = 'MIO-TCD-Localization'
+    dfrow['test_train_val'] = 'train'
+    dfrow['folder'] = 'train'
+    dfrow['filename'] ='{}.jpg'.format(dfrow['image'])
+    dfrow['path'] = os.path.join('miotcd', 'MIO-TCD-Localization', 'train', '{}.jpg'.format(dfrow['image']))
+    dfrow['width'] = img_width
+    dfrow['height'] = img_height
+    dfrow['x_min'] = float(dfrow['gt_x1'])
+    dfrow['x_max'] = float(dfrow['gt_x2'])
+    dfrow['y_min'] = float(dfrow['gt_y1'])
+    dfrow['y_max'] = float(dfrow['gt_y2'])
+    dfrow['yolo_x'], dfrow['yolo_y'], dfrow['yolo_w'], dfrow['yolo_h'] = get_yolo_coordinates(dfrow['gt_x1'],dfrow['gt_x2'], dfrow['gt_y1'],
+                         dfrow['gt_y2'], img_width, img_height)
+    return dfrow[['dataset', 'subset', 'test_train_val', 'folder', 'filename', 'path', 'label', 'width', 'height', 'x_min', 'x_max','y_min', 'y_max', 'yolo_x', 'yolo_y', 'yolo_w', 'yolo_h']]
+
+
+def get_normalised_cityscape_annotations(dfrow):
+    dfrow['dataset'] = 'cityscapes'
+    dfrow['filename'] = '_'.join(dfrow['filename'].split('_', 3)[:3]) + '_leftImg8bit.png'
+    dfrow['width'] = dfrow['imgWidth']
+    dfrow['height'] = dfrow['imgHeight']
+    lst_objects = []
+    for dct_object in dfrow['objects']:
+        lst_bounds = polygon_to_bounding_box(dct_object['polygon'])
+        yolo_x, yolo_y, yolo_w, yolo_h = get_yolo_coordinates(lst_bounds[0], lst_bounds[1], lst_bounds[2],lst_bounds[3], dfrow['imgWidth'],dfrow['imgHeight'])
+        lst_objects.append((dct_object['label'], lst_bounds[0], lst_bounds[1], lst_bounds[2],lst_bounds[3], yolo_x, yolo_y, yolo_w, yolo_h))
+    dfrow['objects'] = lst_objects
+    return dfrow[['dataset', 'filename', 'width', 'height', 'objects']]
 
 def get_bounding_boxes(source):
 
-	annotations_dest_name = os.path.join(dct_global_constants['meta_folder'], 'annotations.csv')
+	annotations_dest_name = os.path.join(dct_global_constants['meta_folder'], 'annotations_cityscape.csv')
 
 	df_annotations = pd.DataFrame(columns=['dataset', 'subset', 'test_train_val', 'folder', 'filename', 'path', 'label', 'width', 'height', 'x_min', 'x_max', 'y_min', 'y_max', 'yolo_x', 'yolo_y', 'yolo_w', 'yolo_h'])
 
@@ -111,89 +148,43 @@ def get_bounding_boxes(source):
 			for folder_path in os.scandir(base_folder):
 				folder = os.path.basename(folder_path)
 				if not folder_path.name.startswith('.') and folder_path.is_dir():
-					for file_path in os.scandir(os.path.join(base_folder, folder)):
-						file = os.path.basename(file_path)
-						if not file_path.name.startswith('.') and file_path.is_file() and os.path.splitext(file)[1].lower() == '.json':
-							with open(os.path.join(base_folder, folder, file)) as f:
-								dct_annotation = json.load(f)
+					lst_json_files = [pos_json for pos_json in os.listdir(os.path.join(base_folder, folder)) if pos_json.endswith('.json')]
+					dct_annotations = {}
+					for json_file in lst_json_files:
+    						with open(os.path.join(base_folder, folder, json_file), "r") as inputjson:
+        						dct_annotations[json_file] = json.load(inputjson)
 
-							for dct_object in dct_annotation['objects']:
-								lst_bounds = polygon_to_bounding_box(dct_object['polygon'])
-
-								yolo_x, yolo_y, yolo_w, yolo_h = get_yolo_coordinates(lst_bounds[0], lst_bounds[1], lst_bounds[2], lst_bounds[3], dct_annotation['imgWidth'], dct_annotation['imgHeight'])
-
-								df_annotations = df_annotations.append(pd.DataFrame({'dataset': 'cityscapes',
-																					 'subset': ('gtFine' if (cat != 'train_extra') else 'gtCoarse'),
-																					 'test_train_val': cat,
-																					 'folder': folder,
-																					 'filename': file,
-																					 'path': os.path.join('cityscapes', ('gtFine_trainvaltest' if (cat != 'train_extra') else 'gtCoarse'), ('gtFine' if (cat != 'train_extra') else 'gtCoarse'), cat, folder, file),
-																					 'label': dct_object['label'],
-																					 'width': dct_annotation['imgWidth'],
-																					 'height': dct_annotation['imgHeight'],
-																					 'x_min': lst_bounds[0],
-																					 'x_max': lst_bounds[1],
-																					 'y_min': lst_bounds[2],
-																					 'y_max': lst_bounds[3],
-																					 'yolo_x': yolo_x,
-																					 'yolo_y': yolo_y,
-																					 'yolo_w': yolo_w,
-																					 'yolo_h': yolo_h,
-
-																					 }, index=[0]),
-																	   ignore_index=True)
-
-								logging.info("Saved annotations from {0}".format(file_path))
-
-
-						df_annotations.to_csv(annotations_dest_name, header=True, index=False)
+					df_annotations_raw = pd.DataFrame(dct_annotations)
+					df_annotations_raw  = df_annotations_raw .T
+					df_annotations_raw ['filename'] = df_annotations_raw .index
+					df_annotations_raw .reset_index(level=0, inplace=True)
+					df_annotations_modified = df_annotations_raw.apply(get_normalised_cityscape_annotations, axis=1)
+					
+					df_annotations_modified = df_annotations_modified.objects.apply(pd.Series).merge(df_annotations, right_index = True, left_index = True).drop(["objects"], axis = 1).melt(id_vars = ['dataset', 'filename', 'width', 'height'], value_name = "object").drop("variable", axis = 1).dropna()
+					lst_new_columns = ['label', 'x_min', 'x_max','y_min', 'y_max', 'yolo_x', 'yolo_y', 'yolo_w', 'yolo_h']
+					for n,col in enumerate(lst_new_columns ):
+    						df_annotations_modified[col] = df_annotations_modified['object'].apply(lambda anno: anno[n])
+					df_annotations_modified = df_annotations_modified.drop('object',axis=1)
+					df_annotations_modified['subset'] =  ('gtFine' if (cat != 'train_extra') else 'gtCoarse')
+					df_annotations_modified['test_train_val'] =  cat
+					df_annotations_modified['folder'] = folder
+					df_annotations_modified['path'] = df_annotations_modified['filename'].apply(lambda x: os.path.join('cityscapes', 'leftImg8bit', cat, folder, x))
+                                                                                                                                                                         
+					df_annotations = df_annotations.append(df_annotations_modified[['dataset', 'subset', 'test_train_val', 'folder', 'filename', 'path', 'label', 'width', 'height', 'x_min', 'x_max','y_min', 'y_max', 'yolo_x', 'yolo_y', 'yolo_w', 'yolo_h']],
+                                       ignore_index=True)
+					
+					logging.info("Saved annotations from {0}".format(os.path.join(base_folder, folder)))
+					df_annotations.to_csv(annotations_dest_name, header=True, index=False)
 
 	if source == "miotcd":
 		annotation_raw_file = os.path.join(dct_global_constants['annotations_folder'], 'miotcd', 'MIO-TCD-Localization',  'gt_train.csv')
 		df_annotations_raw = pd.read_csv(annotation_raw_file, header=None, dtype={0: str})
 		df_annotations_raw.columns = ['image', 'label', 'gt_x1', 'gt_y1', 'gt_x2', 'gt_y2']
 
-		current_image = None
-		img = None
+		df_annotations = df_annotations.append(df_annotations_raw.apply(get_normalised_miot_annotations, axis=1),
+                                                       ignore_index=True)
 
-		for idx, row in df_annotations_raw.iterrows():
-			if current_image is None or row['image'] != current_image:
-				current_image = row['image']
-				logging.info("Processing annotations for {0}".format(
-					os.path.join(dct_global_constants['images_folder'], '{}.jpg'.format(current_image))))
-				img = cv2.imread(os.path.join(dct_global_constants['images_folder'], '{}.jpg'.format(current_image)))
-			height, width, _ = img.shape
-
-			yolo_x, yolo_y, yolo_w, yolo_h = get_yolo_coordinates(row['gt_x1'], row['gt_x2'], row['gt_y1'],
-																  row['gt_y2'], width, height)
-
-			df_annotations = df_annotations.append(pd.DataFrame({'dataset': 'miotct',
-																 'subset': 'MIO-TCD-Localization',
-																 'test_train_val': 'train',
-																 'folder': 'train',
-																 'filename': '{}.jpg'.format(current_image),
-																 'path': os.path.join('miotcd','MIO-TCD-Localization', 'train', '{}.jpg'.format(current_image)),
-																 'label': row['label'],
-																 'width': width,
-																 'height': height,
-																 'x_min': float(row['gt_x1']),
-																 'x_max': float(row['gt_x2']),
-																 'y_min': float(row['gt_y1']),
-																 'y_max': float(row['gt_y2']),
-																 'yolo_x': yolo_x,
-																 'yolo_y': yolo_y,
-																 'yolo_w': yolo_w,
-																 'yolo_h': yolo_h,
-
-																 }, index=[0]),
-												   ignore_index=True)
-
-
-
-			logging.info("Added a {0} from {1}".format(row['label'], '{}.jpg'.format(current_image)))
-
-
-			df_annotations.to_csv(annotations_dest_name, header=True, index=False)
+		df_annotations.to_csv(annotations_dest_name, header=True, index=False)
 
 
 def main(argv):
@@ -221,7 +212,7 @@ def main(argv):
 
 	is_compressed = (args.c == 1)
 
-	download_data(source, is_compressed)
+	#download_data(source, is_compressed)
 	get_bounding_boxes(source)
 
 
