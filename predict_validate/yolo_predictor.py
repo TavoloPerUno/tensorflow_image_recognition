@@ -32,7 +32,7 @@ class YoloPredictor(Predictor):
 		self.net = dn.load_net(self.cfg.encode('utf-8'), self.weights.encode('utf-8'), 0)
 		self.meta = dn.load_meta(self.cdata.encode('utf-8'))
 
-	def predict(self):
+	def predict(self, val=False):
 
 		df_predictions = pd.DataFrame(
 			columns=['id', 'class', 'confidence', 'center_x', 'center_y', 'width', 'height', 'min_x', 'max_x', 'min_y',
@@ -96,5 +96,8 @@ class YoloPredictor(Predictor):
 
 			df_predictions.to_csv(os.path.join(self.data_folder, 'predictions.csv'), index=False)
 			self.df_predictions = df_predictions
+
+			if val:
+				self.validate()
 
 

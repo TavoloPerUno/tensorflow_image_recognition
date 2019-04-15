@@ -38,12 +38,13 @@ class Predictor(ABC):
 
 		super().__init__()
 
-	def validate(self, thres):
+	def validate(self):
 		if self.df_groundtruth.shape[0] > 0 and self.df_predictions.shape[0] > 0:
 			df_prediction_agg = self.df_predictions.copy()
 
 			if 'count' not in list(df_prediction_agg.columns):
-				df_prediction_agg = df_prediction_agg.loc[df_prediction_agg['conf'] >= thres].groupby(['id', 'class'])['conf'].count().reset_index(name='count')
+				df_prediction_agg['is_included'] = df_prediction_agg.apply(lambda x: float(self.dct_class_grouping[x['class']]['thres']) <= x['confidence'], axis=1)
+				df_prediction_agg = df_prediction_agg.loc[df_prediction_agg['is_included'],].groupby(['id', 'class'])['confidence'].count().reset_index(name='count')
 
 			df_results = pd.DataFrame(columns=['id', 'class', 'tp', 'fp', 'tn', 'fn'])
 
@@ -62,10 +63,10 @@ class Predictor(ABC):
 				for category in self.lst_class:
 
 					tp = fp = tn = fn = 0
-					num_predictions = df_candidate_predictions.loc[df_candidate_predictions['class'].isin([category] + ([] if category not in self.dct_class_grouping else self.dct_class_grouping[category])),]['count'].sum()
+					num_predictions = df_candidate_predictions.loc[df_candidate_predictions['class'].isin([category] + ([] if category not in self.dct_class_grouping else self.dct_class_grouping[category]['classes'])),]['count'].sum()
 					num_truth = df_candidate_groundtruth.loc[df_candidate_groundtruth['class'].isin([category] + (
 						[] if category not in self.dct_class_grouping else self.dct_class_grouping[
-							category])),]['count'].sum()
+							category]['classes'])),]['count'].sum()
 
 					if num_predictions == 0 or num_truth == 0:
 						if num_truth > 0:
@@ -105,8 +106,9 @@ class Predictor(ABC):
 			df_results['fdr'] = df_results['fp'] / (df_results['fp'] + df_results['tp'])
 			df_results['for'] = df_results['fn'] / (df_results['fn'] + df_results['tn'])
 			df_results['acc'] = (df_results['tp'] + df_results['tn']) / (df_results['tp'] + df_results['tn'] + df_results['fp'] + df_results['fn'])
+			df_results['conf'] = df_results['class'].apply(lambda x: self.dct_class_grouping[x]['thres'])
 
-			df_results.to_csv(os.path.join(self.data_folder, 'scores' + str(thres) + '.csv'), index=False)
+			df_results.to_csv(os.path.join(self.data_folder, 'scores.csv'), index=False)
 
 			return 1
 		else:

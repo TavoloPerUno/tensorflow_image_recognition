@@ -88,7 +88,7 @@ def main(argv):
 			model.predict()
 
 		if args.val:
-			model.validate(args.prediction_threshold)
+			model.validate()
 
 if __name__ == '__main__':
 	main(sys.argv[1:])

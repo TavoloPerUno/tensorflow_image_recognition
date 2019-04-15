@@ -82,9 +82,9 @@ def download_data(source, is_compressed):
 	return
 
 def get_image_dimensions(imgname):
-    im = Image.open(imgname)
-    width, height = im.size
-    return width, height
+	im = Image.open(imgname)
+	width, height = im.size
+	return width, height
 
 def get_yolo_coordinates(x_min, x_max, y_min, y_max, img_width, img_height):
 	x1 = float(x_min)
@@ -102,40 +102,40 @@ def get_yolo_coordinates(x_min, x_max, y_min, y_max, img_width, img_height):
 	return relative_x_center, relative_y_center, relative_object_width, relative_object_height
 
 def get_normalised_miot_annotations(dfrow):
-    img_width, img_height = get_image_dimensions(os.path.join(dct_global_constants['images_folder'], 'miotcd', 'MIO-TCD-Localization', 'train', '{}.jpg'.format(dfrow['image'])))
-    dfrow['dataset'] = 'miotcd'
-    dfrow['subset'] = 'MIO-TCD-Localization'
-    dfrow['test_train_val'] = 'train'
-    dfrow['folder'] = 'train'
-    dfrow['filename'] ='{}.jpg'.format(dfrow['image'])
-    dfrow['path'] = os.path.join('miotcd', 'MIO-TCD-Localization', 'train', '{}.jpg'.format(dfrow['image']))
-    dfrow['width'] = img_width
-    dfrow['height'] = img_height
-    dfrow['x_min'] = float(dfrow['gt_x1'])
-    dfrow['x_max'] = float(dfrow['gt_x2'])
-    dfrow['y_min'] = float(dfrow['gt_y1'])
-    dfrow['y_max'] = float(dfrow['gt_y2'])
-    dfrow['yolo_x'], dfrow['yolo_y'], dfrow['yolo_w'], dfrow['yolo_h'] = get_yolo_coordinates(dfrow['gt_x1'],dfrow['gt_x2'], dfrow['gt_y1'],
-                         dfrow['gt_y2'], img_width, img_height)
-    return dfrow[['dataset', 'subset', 'test_train_val', 'folder', 'filename', 'path', 'label', 'width', 'height', 'x_min', 'x_max','y_min', 'y_max', 'yolo_x', 'yolo_y', 'yolo_w', 'yolo_h']]
+	img_width, img_height = get_image_dimensions(os.path.join(dct_global_constants['images_folder'], 'miotcd', 'MIO-TCD-Localization', 'train', '{}.jpg'.format(dfrow['image'])))
+	dfrow['dataset'] = 'miotcd'
+	dfrow['subset'] = 'MIO-TCD-Localization'
+	dfrow['test_train_val'] = 'train'
+	dfrow['folder'] = 'train'
+	dfrow['filename'] ='{}.jpg'.format(dfrow['image'])
+	dfrow['path'] = os.path.join('miotcd', 'MIO-TCD-Localization', 'train', '{}.jpg'.format(dfrow['image']))
+	dfrow['width'] = img_width
+	dfrow['height'] = img_height
+	dfrow['x_min'] = float(dfrow['gt_x1'])
+	dfrow['x_max'] = float(dfrow['gt_x2'])
+	dfrow['y_min'] = float(dfrow['gt_y1'])
+	dfrow['y_max'] = float(dfrow['gt_y2'])
+	dfrow['yolo_x'], dfrow['yolo_y'], dfrow['yolo_w'], dfrow['yolo_h'] = get_yolo_coordinates(dfrow['gt_x1'],dfrow['gt_x2'], dfrow['gt_y1'],
+						 dfrow['gt_y2'], img_width, img_height)
+	return dfrow[['dataset', 'subset', 'test_train_val', 'folder', 'filename', 'path', 'label', 'width', 'height', 'x_min', 'x_max','y_min', 'y_max', 'yolo_x', 'yolo_y', 'yolo_w', 'yolo_h']]
 
 
 def get_normalised_cityscape_annotations(dfrow):
-    dfrow['dataset'] = 'cityscapes'
-    dfrow['filename'] = '_'.join(dfrow['filename'].split('_', 3)[:3]) + '_leftImg8bit.png'
-    dfrow['width'] = dfrow['imgWidth']
-    dfrow['height'] = dfrow['imgHeight']
-    lst_objects = []
-    for dct_object in dfrow['objects']:
-        lst_bounds = polygon_to_bounding_box(dct_object['polygon'])
-        yolo_x, yolo_y, yolo_w, yolo_h = get_yolo_coordinates(lst_bounds[0], lst_bounds[1], lst_bounds[2],lst_bounds[3], dfrow['imgWidth'],dfrow['imgHeight'])
-        lst_objects.append((dct_object['label'], lst_bounds[0], lst_bounds[1], lst_bounds[2],lst_bounds[3], yolo_x, yolo_y, yolo_w, yolo_h))
-    dfrow['objects'] = lst_objects
-    return dfrow[['dataset', 'filename', 'width', 'height', 'objects']]
+	dfrow['dataset'] = 'cityscapes'
+	dfrow['filename'] = '_'.join(dfrow['filename'].split('_', 3)[:3]) + '_leftImg8bit.png'
+	dfrow['width'] = dfrow['imgWidth']
+	dfrow['height'] = dfrow['imgHeight']
+	lst_objects = []
+	for dct_object in dfrow['objects']:
+		lst_bounds = polygon_to_bounding_box(dct_object['polygon'])
+		yolo_x, yolo_y, yolo_w, yolo_h = get_yolo_coordinates(lst_bounds[0], lst_bounds[1], lst_bounds[2],lst_bounds[3], dfrow['imgWidth'],dfrow['imgHeight'])
+		lst_objects.append((dct_object['label'], lst_bounds[0], lst_bounds[1], lst_bounds[2],lst_bounds[3], yolo_x, yolo_y, yolo_w, yolo_h))
+	dfrow['objects'] = lst_objects
+	return dfrow[['dataset', 'filename', 'width', 'height', 'objects']]
 
-def get_bounding_boxes(source):
+def normalise_annotations(source):
 
-	annotations_dest_name = os.path.join(dct_global_constants['meta_folder'], 'annotations_cityscape.csv')
+	annotations_dest_name = os.path.join(dct_global_constants['meta_folder'], 'gsv_annotations.csv')
 
 	df_annotations = pd.DataFrame(columns=['dataset', 'subset', 'test_train_val', 'folder', 'filename', 'path', 'label', 'width', 'height', 'x_min', 'x_max', 'y_min', 'y_max', 'yolo_x', 'yolo_y', 'yolo_w', 'yolo_h'])
 
@@ -151,8 +151,8 @@ def get_bounding_boxes(source):
 					lst_json_files = [pos_json for pos_json in os.listdir(os.path.join(base_folder, folder)) if pos_json.endswith('.json')]
 					dct_annotations = {}
 					for json_file in lst_json_files:
-    						with open(os.path.join(base_folder, folder, json_file), "r") as inputjson:
-        						dct_annotations[json_file] = json.load(inputjson)
+						with open(os.path.join(base_folder, folder, json_file), "r") as inputjson:
+							dct_annotations[json_file] = json.load(inputjson)
 
 					df_annotations_raw = pd.DataFrame(dct_annotations)
 					df_annotations_raw  = df_annotations_raw .T
@@ -163,7 +163,7 @@ def get_bounding_boxes(source):
 					df_annotations_modified = df_annotations_modified.objects.apply(pd.Series).merge(df_annotations, right_index = True, left_index = True).drop(["objects"], axis = 1).melt(id_vars = ['dataset', 'filename', 'width', 'height'], value_name = "object").drop("variable", axis = 1).dropna()
 					lst_new_columns = ['label', 'x_min', 'x_max','y_min', 'y_max', 'yolo_x', 'yolo_y', 'yolo_w', 'yolo_h']
 					for n,col in enumerate(lst_new_columns ):
-    						df_annotations_modified[col] = df_annotations_modified['object'].apply(lambda anno: anno[n])
+						df_annotations_modified[col] = df_annotations_modified['object'].apply(lambda anno: anno[n])
 					df_annotations_modified = df_annotations_modified.drop('object',axis=1)
 					df_annotations_modified['subset'] =  ('gtFine' if (cat != 'train_extra') else 'gtCoarse')
 					df_annotations_modified['test_train_val'] =  cat
@@ -213,7 +213,7 @@ def main(argv):
 	is_compressed = (args.c == 1)
 
 	#download_data(source, is_compressed)
-	get_bounding_boxes(source)
+	normalise_annotations(source)
 
 
 if __name__ == '__main__':
