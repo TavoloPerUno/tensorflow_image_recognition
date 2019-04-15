@@ -160,7 +160,7 @@ def normalise_annotations(source):
 					df_annotations_raw .reset_index(level=0, inplace=True)
 					df_annotations_modified = df_annotations_raw.apply(get_normalised_cityscape_annotations, axis=1)
 					
-					df_annotations_modified = df_annotations_modified.objects.apply(pd.Series).merge(df_annotations, right_index = True, left_index = True).drop(["objects"], axis = 1).melt(id_vars = ['dataset', 'filename', 'width', 'height'], value_name = "object").drop("variable", axis = 1).dropna()
+					df_annotations_modified = df_annotations_modified.objects.apply(pd.Series).merge(df_annotations_modified, right_index = True, left_index = True).drop(["objects"], axis = 1).melt(id_vars = ['dataset', 'filename', 'width', 'height'], value_name = "object").drop("variable", axis = 1).dropna()
 					lst_new_columns = ['label', 'x_min', 'x_max','y_min', 'y_max', 'yolo_x', 'yolo_y', 'yolo_w', 'yolo_h']
 					for n,col in enumerate(lst_new_columns ):
 						df_annotations_modified[col] = df_annotations_modified['object'].apply(lambda anno: anno[n])
