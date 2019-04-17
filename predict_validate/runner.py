@@ -3,8 +3,8 @@ import os
 import logging
 import datetime
 import sys
-
-from predict_validate.dataset_prep import edit_image_urls
+sys.path.append('..', )
+from predict_validate.helper import edit_image_urls
 from predict_validate.yolo_predictor import YoloPredictor
 
 logname = os.path.join('..', 'logs', 'tensorflow_image_recognition_detection {:%Y-%m-%d %H:%M:%S}.log'.format(datetime.datetime.now()))
@@ -85,7 +85,7 @@ def main(argv):
 				 args.file_groundtruth, args.file_predictions)
 
 		if args.p:
-			model.predict()
+			model.predict(args.val)
 
 		if args.val:
 			model.validate()

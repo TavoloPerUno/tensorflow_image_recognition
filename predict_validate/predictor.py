@@ -5,6 +5,8 @@ import json
 import os
 import csv
 
+from predict_validate.helper import invert_class_grouping_dict
+
 class Predictor(ABC):
 
 	def __init__(self, model_name, data_folder, file_imagelist, file_class, images_from_api=False, images_location=None, file_class_grouping_json=None, file_groundtruth=None, file_predictions=None):
@@ -31,6 +33,7 @@ class Predictor(ABC):
 		if file_class_grouping_json is not None:
 			with open(file_class_grouping_json) as f:
 				self.dct_class_grouping = json.load(f)
+            self.dct_class_name_map = invert_class_grouping_dict(self.dct_class_grouping)
 
 
 		if file_predictions is not None:
@@ -43,12 +46,14 @@ class Predictor(ABC):
 			df_prediction_agg = self.df_predictions.copy()
 
 			if 'count' not in list(df_prediction_agg.columns):
+                df_prediction_agg['class'] = df_prediction_agg['class'].apply(lambda x: self.dct_class_name_map[x])
 				df_prediction_agg['is_included'] = df_prediction_agg.apply(lambda x: float(self.dct_class_grouping[x['class']]['thres']) <= x['confidence'], axis=1)
 				df_prediction_agg = df_prediction_agg.loc[df_prediction_agg['is_included'],].groupby(['id', 'class'])['confidence'].count().reset_index(name='count')
 
 			df_results = pd.DataFrame(columns=['id', 'class', 'tp', 'fp', 'tn', 'fn'])
 
-			df_groundtruth_matched = self.df_groundtruth.loc[self.df_groundtruth.id.isin(df_prediction_agg.id),]
+			df_groundtruth_matched = self.df_groundtruth.loc[self.df_groundtruth.id.isin(df_prediction_agg.id),].copy()
+            df_groundtruth_matched['class'] = df_groundtruth_matched['class'].apply(lambda x: self.dct_class_name_map[x])
 
 			logging.info("Size of validation set: {0}".format(str(df_groundtruth_matched.shape[0])))
 

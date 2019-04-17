@@ -9,7 +9,7 @@ import cv2
 import pandas as pd
 
 # sys.path.append('/Users/Manu/Documents/pyWorkspace/darknet/python')
-DARKNET_LOCATION = '/Users/Manu/Documents/pyWorkspace/darknet'
+DARKNET_LOCATION = '/project2/kavibhalla/libraries/darknet'
 
 sys.path.append(DARKNET_LOCATION)
 sys.path.append('..', )
