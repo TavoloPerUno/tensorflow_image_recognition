@@ -143,14 +143,25 @@ def get_normalised_cbcl_annotations(dfrow):
 	dfrow['width'] = img_width
 	dfrow['height'] = img_height
 	lst_objects = []
-	for dct_object in dfrow['object']:
-		if not dct_object['deleted']:
 
-			lst_bounds = polygon_to_bounding_box([[dct_pt['x'], dct_pt['y']] for dct_pt in dct_object['polygon']['pt']])
-			yolo_x, yolo_y, yolo_w, yolo_h = get_yolo_coordinates(lst_bounds[0], lst_bounds[1], lst_bounds[2],lst_bounds[3],img_width,img_height)
-			lst_objects.append((dct_object['name'].strip(), lst_bounds[0], lst_bounds[1], lst_bounds[2],lst_bounds[3], yolo_x, yolo_y, yolo_w, yolo_h))
-	dfrow['objects'] = lst_objects
-	return dfrow[['dataset', 'filename', 'width', 'height', 'objects']]
+	if type(dfrow['object']) is dict():
+		dfrow['object'] = [dfrow['object']]
+	if type(dfrow['object']) is list:
+		for dct_object in dfrow['object']:
+			if type(dct_object) is dict():
+				if not dct_object['deleted']:
+
+					lst_bounds = polygon_to_bounding_box([[dct_pt['x'], dct_pt['y']] for dct_pt in dct_object['polygon']['pt']])
+					yolo_x, yolo_y, yolo_w, yolo_h = get_yolo_coordinates(lst_bounds[0], lst_bounds[1], lst_bounds[2],lst_bounds[3],img_width,img_height)
+					lst_objects.append((dct_object['name'].strip(), lst_bounds[0], lst_bounds[1], lst_bounds[2],lst_bounds[3], yolo_x, yolo_y, yolo_w, yolo_h))
+			else:
+				logging.info("Strange annotation from {0}".format(dfrow['filename']))
+				logging.info(dct_object)
+		dfrow['objects'] = lst_objects
+	if len(dfrow['objects']) > 0:
+		return dfrow[['dataset', 'filename', 'width', 'height', 'objects']]
+	else:
+		return pd.DataFrame(columns=['dataset', 'filename', 'width', 'height', 'objects'])
 
 def normalise_annotations(source):
 
