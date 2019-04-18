@@ -12,6 +12,7 @@ from PIL import Image
 from xmljson import parker
 from logging.handlers import TimedRotatingFileHandler
 import xml.etree.ElementTree as ET
+import collections
 
 sys.path.append('..', )
 
@@ -144,11 +145,11 @@ def get_normalised_cbcl_annotations(dfrow):
 	dfrow['height'] = img_height
 	lst_objects = []
 
-	if type(dfrow['object']) is dict():
+	if type(dfrow['object']) in [collections.OrderedDict, dict]:
 		dfrow['object'] = [dfrow['object']]
 	if type(dfrow['object']) is list:
 		for dct_object in dfrow['object']:
-			if type(dct_object) is dict():
+			if type(dct_object) in [collections.OrderedDict, dict]:
 				if not dct_object['deleted']:
 
 					lst_bounds = polygon_to_bounding_box([[dct_pt['x'], dct_pt['y']] for dct_pt in dct_object['polygon']['pt']])
@@ -158,10 +159,9 @@ def get_normalised_cbcl_annotations(dfrow):
 				logging.info("Strange annotation from {0}".format(dfrow['filename']))
 				logging.info(dct_object)
 		dfrow['objects'] = lst_objects
-	if len(dfrow['objects']) > 0:
-		return dfrow[['dataset', 'filename', 'width', 'height', 'objects']]
-	else:
-		return pd.DataFrame(columns=['dataset', 'filename', 'width', 'height', 'objects'])
+		if len(lst_objects) > 0:
+			return dfrow[['dataset', 'filename', 'width', 'height', 'objects']]
+	return pd.DataFrame(columns=['dataset', 'filename', 'width', 'height', 'objects'])
 
 def normalise_annotations(source):
 
