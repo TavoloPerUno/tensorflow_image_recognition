@@ -175,6 +175,9 @@ def get_normalised_cbcl_annotations(dfrow):
 		dfrow['objects'] = lst_objects
 		if len(lst_objects) > 0:
 			return dfrow[['dataset', 'filename', 'width', 'height', 'objects']]
+
+	logging.info("Strange annotation from {0}".format(dfrow['filename']))
+	logging.info(dfrow['object'])
 	return pd.DataFrame(columns=['dataset', 'filename', 'width', 'height', 'objects'])
 
 def normalise_annotations(source):
@@ -247,6 +250,7 @@ def normalise_annotations(source):
 															.drop("variable", axis=1)\
 															.dropna()
 		lst_new_columns = ['label', 'x_min', 'x_max', 'y_min', 'y_max', 'yolo_x', 'yolo_y', 'yolo_w', 'yolo_h']
+		df_annotations_modified = df_annotations_modified[df_annotations_modified['object'].apply(lambda x: len(x)) > 0]
 		for n, col in enumerate(lst_new_columns):
 			df_annotations_modified[col] = df_annotations_modified['object'].apply(lambda anno: anno[n])
 		df_annotations_modified = df_annotations_modified.drop('object', axis=1)
