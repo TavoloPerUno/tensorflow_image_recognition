@@ -13,6 +13,7 @@ from xmljson import parker
 from logging.handlers import TimedRotatingFileHandler
 import xml.etree.ElementTree as ET
 import collections
+import numpy as np
 
 sys.path.append('..', )
 
@@ -138,47 +139,49 @@ def get_normalised_cityscape_annotations(dfrow):
 
 def get_normalised_cbcl_annotations(dfrow):
 	dfrow['dataset'] = 'cbcl'
+	dfrow['filename'] = dfrow['filename'].strip()
 	img_width, img_height = get_image_dimensions(
-		os.path.join(dct_global_constants['images_folder'], 'cbcl', 'Original', dfrow['filename'].strip()))
+		os.path.join(dct_global_constants['images_folder'], 'cbcl', 'Original', dfrow['filename'] ))
 
 	dfrow['width'] = img_width
 	dfrow['height'] = img_height
 	lst_objects = []
 
-	if type(dfrow['object']) in [collections.OrderedDict, dict]:
-		dfrow['object'] = [dfrow['object']]
-	if type(dfrow['object']) is list:
-		for dct_object in dfrow['object']:
-			if type(dct_object) in [collections.OrderedDict, dict]:
-				if not dct_object['deleted'] and 'polygon' in dct_object:
+	if 'object' in dfrow:
+		if (type(dfrow['object']) in [collections.OrderedDict, dict]):
+			dfrow['object'] = [dfrow['object']]
+		if type(dfrow['object']) is list:
+			for dct_object in dfrow['object']:
+				if type(dct_object) in [collections.OrderedDict, dict]:
+					if not dct_object['deleted'] and 'polygon' in dct_object:
 
-					dctlst_pt = dct_object['polygon']['pt']
+						dctlst_pt = dct_object['polygon']['pt']
 
-					if type(dct_object['polygon']['pt']) in [collections.OrderedDict, dict]:
-						dctlst_pt = [dct_object['polygon']['pt']]
+						if type(dct_object['polygon']['pt']) in [collections.OrderedDict, dict]:
+							dctlst_pt = [dct_object['polygon']['pt']]
 
-					lst_pt = []
-					for dct_pt in dctlst_pt:
-						if type(dct_pt) in [collections.OrderedDict, dict]:
-							lst_pt.append([dct_pt['x'], dct_pt['y']])
+						lst_pt = []
+						for dct_pt in dctlst_pt:
+							if type(dct_pt) in [collections.OrderedDict, dict]:
+								lst_pt.append([dct_pt['x'], dct_pt['y']])
 
-					if len(lst_pt) > 0:
+						if len(lst_pt) > 0:
 
-						lst_bounds = polygon_to_bounding_box(lst_pt)
-						yolo_x, yolo_y, yolo_w, yolo_h = get_yolo_coordinates(lst_bounds[0], lst_bounds[1], lst_bounds[2],lst_bounds[3],img_width,img_height)
-						lst_objects.append((dct_object['name'].strip(), lst_bounds[0], lst_bounds[1], lst_bounds[2],lst_bounds[3], yolo_x, yolo_y, yolo_w, yolo_h))
+							lst_bounds = polygon_to_bounding_box(lst_pt)
+							yolo_x, yolo_y, yolo_w, yolo_h = get_yolo_coordinates(lst_bounds[0], lst_bounds[1], lst_bounds[2],lst_bounds[3],img_width,img_height)
+							lst_objects.append((dct_object['name'].strip(), lst_bounds[0], lst_bounds[1], lst_bounds[2],lst_bounds[3], yolo_x, yolo_y, yolo_w, yolo_h))
 
-						continue
+							continue
 
-			logging.info("Strange annotation from {0}".format(dfrow['filename']))
-			logging.info(dct_object)
-		dfrow['objects'] = lst_objects
-		if len(lst_objects) > 0:
-			return dfrow[['dataset', 'filename', 'width', 'height', 'objects']]
+				logging.info("Strange annotation from {0}".format(dfrow['filename']))
+				logging.info(dct_object)
+	if len(lst_objects) < 1:
+		logging.info("Strange annotation from {0}".format(dfrow['filename']))
+		logging.info(dfrow['object'])
+		lst_objects.append([np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan])
+	dfrow['objects'] = lst_objects
 
-	logging.info("Strange annotation from {0}".format(dfrow['filename']))
-	logging.info(dfrow['object'])
-	return pd.DataFrame(columns=['dataset', 'filename', 'width', 'height', 'objects'])
+	return dfrow[['dataset', 'filename', 'width', 'height', 'objects']]
 
 def normalise_annotations(source):
 
@@ -250,7 +253,6 @@ def normalise_annotations(source):
 															.drop("variable", axis=1)\
 															.dropna()
 		lst_new_columns = ['label', 'x_min', 'x_max', 'y_min', 'y_max', 'yolo_x', 'yolo_y', 'yolo_w', 'yolo_h']
-		df_annotations_modified = df_annotations_modified[df_annotations_modified['object'].apply(lambda x: len(x)) > 0]
 		for n, col in enumerate(lst_new_columns):
 			df_annotations_modified[col] = df_annotations_modified['object'].apply(lambda anno: anno[n])
 		df_annotations_modified = df_annotations_modified.drop('object', axis=1)
