@@ -9,7 +9,9 @@ import argparse
 import json
 import shutil
 from PIL import Image
+from xmljson import parker
 from logging.handlers import TimedRotatingFileHandler
+import xml.etree.ElementTree as ET
 
 sys.path.append('..', )
 
@@ -133,6 +135,23 @@ def get_normalised_cityscape_annotations(dfrow):
 	dfrow['objects'] = lst_objects
 	return dfrow[['dataset', 'filename', 'width', 'height', 'objects']]
 
+def get_normalised_cbcl_annotations(dfrow):
+	dfrow['dataset'] = 'cbcl'
+	img_width, img_height = get_image_dimensions(
+		os.path.join(dct_global_constants['images_folder'], 'cbcl', 'Original', dfrow['filename'].strip()))
+
+	dfrow['width'] = img_width
+	dfrow['height'] = img_height
+	lst_objects = []
+	for dct_object in dfrow['object']:
+		if not dct_object['deleted']:
+
+			lst_bounds = polygon_to_bounding_box([[dct_pt['x'], dct_pt['y']] for dct_pt in dct_object['polygon']['pt']])
+			yolo_x, yolo_y, yolo_w, yolo_h = get_yolo_coordinates(lst_bounds[0], lst_bounds[1], lst_bounds[2],lst_bounds[3],img_width,img_height)
+			lst_objects.append((dct_object['name'].strip(), lst_bounds[0], lst_bounds[1], lst_bounds[2],lst_bounds[3], yolo_x, yolo_y, yolo_w, yolo_h))
+	dfrow['objects'] = lst_objects
+	return dfrow[['dataset', 'filename', 'width', 'height', 'objects']]
+
 def normalise_annotations(source):
 
 	annotations_dest_name = os.path.join(dct_global_constants['meta_folder'], 'gsv_annotations.csv')
@@ -176,6 +195,50 @@ def normalise_annotations(source):
 					logging.info("Saved annotations from {0}".format(os.path.join(base_folder, folder)))
 					df_annotations.to_csv(annotations_dest_name, header=True, index=False)
 
+	if source == "cbcl":
+		base_folder = os.path.join(dct_global_constants['annotations_folder'], 'cbcl', 'Anno_XML')
+		lst_xml_files = [pos_xml for pos_xml in os.listdir(base_folder) if
+						  pos_xml.endswith('.xml')]
+
+		dct_annotations = dict()
+		for xml_file in lst_xml_files:
+			dct_annotations[xml_file] = parker.data(ET.parse(os.path.join(base_folder, xml_file)).getroot(), preserve_root=False)
+
+			# with open(os.path.join(base_folder, xml_file), "r") as inputxml:
+			# 	dct_annotations[xml_file] = parker.data(fromstring(inputxml), preserve_root=False)
+
+		df_annotations_raw = pd.DataFrame(dct_annotations)
+		df_annotations_raw = df_annotations_raw.T
+		df_annotations_raw.reset_index(level=0, inplace=True)
+		df_annotations_modified = df_annotations_raw.apply(get_normalised_cbcl_annotations, axis=1)
+
+		df_annotations_modified = df_annotations_modified.objects\
+															.apply(pd.Series)\
+															.merge(	df_annotations_modified,
+				   													right_index=True,
+																	left_index=True)\
+															.drop(["objects"], axis=1)\
+															.melt(id_vars=['dataset', 'filename', 'width', 'height'], value_name="object")\
+															.drop("variable", axis=1)\
+															.dropna()
+		lst_new_columns = ['label', 'x_min', 'x_max', 'y_min', 'y_max', 'yolo_x', 'yolo_y', 'yolo_w', 'yolo_h']
+		for n, col in enumerate(lst_new_columns):
+			df_annotations_modified[col] = df_annotations_modified['object'].apply(lambda anno: anno[n])
+		df_annotations_modified = df_annotations_modified.drop('object', axis=1)
+		df_annotations_modified['subset'] = ''
+		df_annotations_modified['test_train_val'] = 'train'
+		df_annotations_modified['folder'] = 'Original'
+		df_annotations_modified['path'] = df_annotations_modified['filename'].apply(lambda x: os.path.join('cbcl', 'Original', x))
+
+		df_annotations = df_annotations.append(df_annotations_modified[
+												   ['dataset', 'subset', 'test_train_val', 'folder', 'filename', 'path',
+													'label', 'width', 'height', 'x_min', 'x_max', 'y_min', 'y_max',
+													'yolo_x', 'yolo_y', 'yolo_w', 'yolo_h']],
+											   ignore_index=True)
+
+		logging.info("Saved annotations from cbcl")
+		df_annotations.to_csv(annotations_dest_name, header=True, index=False)
+
 	if source == "miotcd":
 		annotation_raw_file = os.path.join(dct_global_constants['annotations_folder'], 'miotcd', 'MIO-TCD-Localization',  'gt_train.csv')
 		df_annotations_raw = pd.read_csv(annotation_raw_file, header=None, dtype={0: str})
@@ -193,9 +256,6 @@ def main(argv):
 	parser.add_argument('s', type=str,
 						help='Dataset name. Supported types: cityscapes, mapillaryvistas')
 
-	parser.add_argument('c', type=int,
-						help='Are input files compressed?')
-
 	parser.add_argument('-t', type=str,
 						help='annotation_type')
 
@@ -209,8 +269,6 @@ def main(argv):
 	args = parser.parse_args()
 
 	source = args.s
-
-	is_compressed = (args.c == 1)
 
 	#download_data(source, is_compressed)
 	normalise_annotations(source)

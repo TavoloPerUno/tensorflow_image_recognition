@@ -38,6 +38,9 @@ class YoloPredictor(Predictor):
 			columns=['id', 'class', 'confidence', 'center_x', 'center_y', 'width', 'height', 'min_x', 'max_x', 'min_y',
 					 'max_y'])
 
+		if self.df_predictions.shape[0] > 0:
+			df_predictions = self.df_predictions.copy()
+
 		if not os.path.exists(os.path.join(self.data_folder, 'predictions')):
 			os.makedirs(os.path.join(self.data_folder, 'predictions'))
 
