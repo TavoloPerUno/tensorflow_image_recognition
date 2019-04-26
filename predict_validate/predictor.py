@@ -76,19 +76,32 @@ class Predictor(ABC):
 
 					if num_predictions == 0 or num_truth == 0:
 						if num_truth > 0:
-							fn = num_truth
+							fn = 1 if (num_truth == 1) else (3 if (num_truth == 2) else 6)
 						elif num_predictions > 0:
 							fp = num_predictions
 						else:
 							tn = 1
 
-					elif num_predictions > num_truth:
-						fp = num_predictions - num_truth
-						tp = num_truth
-
+					elif num_truth == 1:
+						tp = min(num_predictions, 3)
+						fp = max(0, num_predictions - 3)
+					elif num_truth == 2:
+						tp = min(num_predictions, 5)
+						fp = max(0, num_predictions - 5)
+						fn = max(3 - num_predictions, 0)
 					else:
 						tp = num_predictions
-						fn = num_truth - num_predictions
+						fn = max(6 - num_predictions, 0)
+
+					#
+					# elif num_predictions > num_truth:
+					#
+					# 	fp = num_predictions - num_truth
+					# 	tp = num_truth
+					#
+					# else:
+					# 	tp = num_predictions
+					# 	fn = num_truth - num_predictions
 
 					df_results = df_results.append(pd.DataFrame({'id': id,
 													             'class': category,
