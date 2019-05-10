@@ -45,13 +45,19 @@ class YoloPredictor(Predictor):
 			os.makedirs(os.path.join(self.data_folder, 'predictions'))
 
 		for idx, row in self.df_images[['id', 'location']].drop_duplicates().iterrows():
+			logging.info("Processing image id " + str(row['id']))
 			output_img = os.path.join(self.data_folder, 'predictions', str(row['id']) + '.jpg')
-			img = io.imread(row['location'] if self.images_from_api else os.path.join(self.images_location, str(row['id']) + '.jpg'))
-			io.imsave(output_img, img)
+			while True:
+				try:
+					img = io.imread(row['location'] if self.images_from_api else os.path.join(self.images_location, str(row['id']) + '.jpg'))
+					io.imsave(output_img, img)
+					break
+				except:
+					logging.error("Error opening " + row['location'] if self.images_from_api else os.path.join(self.images_location, str(row['id']) + '.jpg'))
 
 			pathb = output_img.encode('utf-8')
 			res = dn.detect(self.net, self.meta, pathb)
-			logging.info("Processing image id " + str(row['id']))
+
 			logging.info(res)  # list of name, probability, bounding box center x, center y, width, height
 			img = cv2.imread(output_img)
 			for i in range(len(res)):
