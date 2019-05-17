@@ -77,4 +77,4 @@ class MapillaryVistas(Annotations):
 				if os.path.splitext(filename)[1].lower() == '.png':
 					self.df_annotations = self.df_annotations.append(self.normalise_annotation_row(filename, os.path.join(self.annotations_folder, cat, 'instances'), cat, dctlst_label))
 
-		self.df_annotations.to_csv(self.annotations_dest_name, header=True, index=False)
+					self.df_annotations.to_csv(self.annotations_dest_name, header=True, index=False)
